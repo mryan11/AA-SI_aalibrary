@@ -25,6 +25,7 @@ def get_all_ship_info() -> List:
             uuids and other fields.
     """
 
+
     response = requests.get(
         url=(
             "https://vocab.ices.dk/services/api/Code/"
