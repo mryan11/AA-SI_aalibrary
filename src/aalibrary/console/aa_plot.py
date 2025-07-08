@@ -40,7 +40,7 @@ def plot_data(sv_da, args):
     if getattr(args, "output_file", None):
         print(f"💾 Saving plot to {args.output_file}")
         plt.savefig(args.output_file, dpi=300)
-    else:
+    else: 
         print("👀 Displaying plot interactively")
         plt.show()
 

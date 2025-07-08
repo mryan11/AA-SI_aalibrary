@@ -4,6 +4,7 @@ from typing import List
 import requests
 import json
 import logging
+import string
 
 import boto3
 
@@ -27,7 +28,7 @@ from aalibrary import config
 #                        os.path.normpath(file_download_location), file_name])
 
 
-def get_file_name_from_url(url: str = ""):
+def get_file_name_from_url(url: str = "") -> str:
     """Extracts the file name from a given storage bucket url. Includes the
     file extension.
 
@@ -320,3 +321,39 @@ def get_netcdf_gcp_location_from_raw_gcp_location(
     )
 
     return netcdf_gcp_storage_bucket_location
+
+
+def normalize_ship_name(ship_name: str = "") -> str:
+    """Normalizes a ship's name. This is necessary for creating a deterministic
+    file structure within our GCP storage bucket.
+    The ship name is returned as a Title_Cased_And_Snake_Cased ship name, with
+    no punctuation.
+    Ex. `HENRY B. BIGELOW` will return `Henry_B_Bigelow`
+
+    Args:
+        ship_name (str, optional): The ship name string. Defaults to "".
+
+    Returns:
+        str: The formatted and normalized version of the ship name.
+    """
+
+    # Lower case the string
+    ship_name = ship_name.lower()
+    # Un-normalize (replace `_` with ` ` to help further processing)
+    # In the edge-case that users include an underscore.
+    ship_name = ship_name.replace("_", " ")
+    # Remove all punctuation.
+    ship_name = "".join(
+        [char for char in ship_name if char not in string.punctuation]
+    )
+    # Title-case it
+    ship_name = ship_name.title()
+    # Snake-case it
+    ship_name = ship_name.replace(" ", "_")
+
+    return ship_name
+
+
+if __name__ == "__main__":
+    print(string.punctuation)
+    print(normalize_ship_name("Reuben Lasker"))

@@ -97,7 +97,7 @@ class TestRawFileCreationErrors:
             )
 
     def test_raw_file_object_creation_null_ship_name(self):
-        """Tests the error-handling for RawFile class when there is an null
+        """Tests the error-handling for RawFile class when there is an invalid
         `ship_name` param."""
         with pytest.raises(Exception):
             RawFile(
@@ -112,14 +112,14 @@ class TestRawFileCreationErrors:
                 debug=self.debug,
             )
 
-    def test_raw_file_object_creation_invalid_ship_name(self):
-        """Tests the error-handling for RawFile class when there is an invalid
-        `ship_name` param. Such as when there is a space in the name."""
+    def test_raw_file_object_creation_validity_of_normalized_ship_name(self):
+        """Tests the error-handling for RawFile class when there is an
+        `ship_name` param that does not exist in the ICES database."""
         with pytest.raises(Exception):
             RawFile(
                 file_name=self.file_name,
                 file_type=self.file_type,
-                ship_name="Reuben Lasker",
+                ship_name="Queen Anne's Revenge",
                 survey_name=self.survey_name,
                 echosounder=self.echosounder,
                 data_source=self.data_source,

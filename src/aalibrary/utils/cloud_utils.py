@@ -16,7 +16,7 @@ from aalibrary.utils.helpers import (
 
 
 def setup_gbq_client_objs(
-    location: str = "US", project_id: str = "ggn-nmfs-gsds-prod-1"
+    location: str = "US", project_id: str = "ggn-nmfs-aa-dev-1"
 ) -> Tuple[bigquery.Client, gcsfs.GCSFileSystem]:
     """Sets up Google Big Query client objects used to execute queries and
     such.
@@ -26,7 +26,7 @@ def setup_gbq_client_objs(
             tables/database. This is usually set when creating the database in
             big query. Defaults to "US".
         project_id (str, optional): The project id that the big query instance
-            belongs to. Defaults to "ggn-nmfs-gsds-prod-1".
+            belongs to. Defaults to "ggn-nmfs-aa-dev-1".
 
     Returns:
         Tuple: The big query client object, along with an object for the Google
@@ -140,7 +140,7 @@ def count_objects_in_s3_bucket_location(
     Args:
         prefix (str, optional): The bucket location. Defaults to "".
         bucket (boto3.resource, optional): The bucket resource object.
-        Defaults to None.
+            Defaults to None.
 
     Returns:
         int: The count of objects within the location.
@@ -158,7 +158,7 @@ def count_subdirectories_in_s3_bucket_location(
     Args:
         prefix (str, optional): The bucket location. Defaults to "".
         bucket (boto3.resource, optional): The bucket resource object.
-        Defaults to None.
+            Defaults to None.
 
     Returns:
         int: The count of subdirectories within the location.
@@ -175,64 +175,79 @@ def count_subdirectories_in_s3_bucket_location(
 
 def get_subdirectories_in_s3_bucket_location(
     prefix: str = "",
-    bucket: boto3.resource = None,
+    s3_client: boto3.client = None,
     return_full_paths: bool = False,
+    bucket_name: str = "noaa-wcsd-pds",
 ) -> List[str]:
     """Gets a list of all the subdirectories in a specific bucket location
     (called a prefix). The return can be with full paths (root to folder
     inclusive), or just the folder names.
 
     Args:
-        prefix (str, optional): The bucket location. Defaults to "".
-        bucket (boto3.resource, optional): The bucket resource object.
+        prefix (str, optional): The bucket folder location. Defaults to "".
+        s3_client (boto3.client, optional): The bucket client object.
             Defaults to None.
         return_full_paths (bool, optional): Whether or not you want a full
             path from bucket root to the subdirectory returned. Set to false
             if you only want the subdirectory names listed. Defaults to False.
+        bucket_name (str, optional): The bucket name. Defaults to
+            "noaa-wcsd-pds".
 
     Returns:
         List[str]: A list of strings, each being the subdirectory. Whether
-            these are full paths or not are specified by the
+            these are full paths or just folder names are specified by the
             `return_full_paths` parameter.
     """
 
     subdirs = set()
-    for obj in bucket.objects.filter(Prefix=prefix):
-        prefix = "/".join(obj.key.split("/")[:-1])
-        if len(prefix) and prefix not in subdirs:
-            subdirs.add(prefix)
-            # print(prefix + "/")
-    if return_full_paths:
-        return list(subdirs)
-    else:
-        subdirs = [x.split("/")[-1] for x in subdirs]
-        return subdirs
+    result = s3_client.list_objects(
+        Bucket=bucket_name, Prefix=prefix, Delimiter="/"
+    )
+    for o in result.get("CommonPrefixes"):
+        subdir_full_path_from_prefix = o.get("Prefix")
+        if return_full_paths:
+            subdir = subdir_full_path_from_prefix
+        else:
+            subdir = subdir_full_path_from_prefix.replace(prefix, "")
+            subdir = subdir.replace("/", "")
+        subdirs.add(subdir)
+    return list(subdirs)
 
 
 def list_all_objects_in_s3_bucket_location(
-    prefix: str = "", bucket: boto3.resource = None
-):
+    prefix: str = "",
+    s3_resource: boto3.resource = None,
+    return_full_paths: bool = False,
+    bucket_name: str = "noaa-wcsd-pds",
+) -> List[str]:
     """Lists all of the objects in a s3 bucket location denoted by `prefix`.
-    Returns a list containing tuples. Each tuple refers to one object, with
-    the first item in the tuple being the full path of the object, and the
-    second item being the object name (file name).
+    Returns a list containing str. You get full paths if you specify the
+    `return_full_paths` parameter.
 
     Args:
         prefix (str, optional): The bucket location. Defaults to "".
-        bucket (boto3.resource, optional): The bucket resource object.
-        Defaults to None.
+        s3_resource (boto3.resource, optional): The bucket resource object.
+            Defaults to None.
+        return_full_paths (bool, optional): Whether or not you want a full
+            path from bucket root to the subdirectory returned. Set to false
+            if you only want the subdirectory names listed. Defaults to False.
+        bucket_name (str, optional): The bucket name. Defaults to
+            "noaa-wcsd-pds".
 
     Returns:
-        List[Tuple(str, str)]: Each tuple refers to one object, with the first
-            item in the tuple being the full path of the object, and the
-            second item being the object name (file name).
+        List[str]: A list of strings containing either the objects name or
+            path, dependent on the `return_full_paths` parameter.
     """
 
-    object_keys = []
+    object_keys = set()
+    bucket = s3_resource.Bucket(bucket_name)
     for obj in bucket.objects.filter(Prefix=prefix):
-        object_keys.append((obj.key, obj.key.split("/")[-1]))
+        if return_full_paths:
+            object_keys.add(obj.key)
+        else:
+            object_keys.add(obj.key.split("/")[-1])
 
-    return object_keys
+    return list(object_keys)
 
 
 def check_if_file_exists_in_gcp(
@@ -263,8 +278,8 @@ def download_file_from_gcp(
     """Downloads a file from the blob storage bucket.
 
     Args:
-        bucket (storage.Client.bucket): The bucket object used for downloading
-            from.
+        gcp_bucket (storage.Client.bucket): The bucket object used for
+            downloading from.
         blob_file_path (str): The blob's file path.
             Ex. "data/itds/logs/execute_rasp_ii/temp.csv"
             NOTE: This must include the file name as well as the extension.
@@ -472,7 +487,7 @@ def bq_query_to_pandas(client: bigquery.Client = None, query: str = ""):
 if __name__ == "__main__":
     s3_client, s3_resource, s3_bucket = create_s3_objs()
     all_objs = list_all_objects_in_s3_bucket_location(
-        prefix="data/raw/Reuben_Lasker/RL2107/metadata", bucket=s3_bucket
+        prefix="data/raw/Reuben_Lasker/RL2107/metadata", s3_resource=s3_bucket
     )
 
     print(all_objs)
